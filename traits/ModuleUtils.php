@@ -106,7 +106,7 @@ trait ModuleUtils {
             throw new Exception("Album Name cannot be empty or missing!");
         }
         // get the album_id from Google by album_name
-        $album_id = $this->initAlbum($payload["album_name"], null);
+        $album_id = $this->initAlbum($project_id, $payload["album_name"], null);
         // set the album_id and album_name value in REDCap
         $this->setProjectSetting("album_id", $album_id, $project_id);
         $this->setProjectSetting("album_name", $payload["album_name"], $project_id);
