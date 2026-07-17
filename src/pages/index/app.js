@@ -5,7 +5,7 @@ import PrimeVue from "primevue/config";
 import Lara from '@primevue/themes/lara';
 
 import ProgressSpinner from 'primevue/progressspinner';
-import BlockUI from 'primevue/blockui';
+import Dialog from "primevue/dialog";
 import Tooltip from 'primevue/tooltip';
 
 const app = createApp(App);
@@ -18,7 +18,7 @@ app.use(PrimeVue, {
 
 app.directive('tooltip', Tooltip);
 
-app.component("BlockUI", BlockUI);
+app.component("Dialog", Dialog);
 app.component("ProgressSpinner", ProgressSpinner);
 
 app.mount("#GOOGLE_PHOTOS_INDEX");

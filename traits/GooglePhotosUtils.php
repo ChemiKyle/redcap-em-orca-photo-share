@@ -1,94 +1,124 @@
 <?php
+declare(strict_types=1);
 namespace OrcaPhotoShare\ExternalModule;
 
 require_once 'vendor/autoload.php';
 
-use Google\ApiCore\ApiException;
-use Google\ApiCore\ValidationException;
-use Google\Auth\Credentials\UserRefreshCredentials;
-use Google\Photos\Library\V1\NewMediaItem;
-use Google\Photos\Library\V1\PhotosLibraryClient;
-use Google\Photos\Library\V1\PhotosLibraryResourceFactory;
+use Google\Exception as GoogleException;
+use GuzzleHttp\Client as GuzzleClient;
 use GuzzleHttp\Exception\GuzzleException;
+use GuzzleHttp\Exception\RequestException;
 use JsonException;
 
 trait GooglePhotosUtils {
 
-    private $_album_id = null;
-    private $_credentials = null;
-    private $_authCredentials = [];
-    private $_photosLibraryClient = null;
+    private ?string $_album_id = null;
+    private array $_guzzleClients = [];
 
-    function getCredentials($project_id) {
-        if ($this->_credentials === null) {
-            $this->_credentials = array_intersect_key($this->getModuleConfig($project_id), [
-                "client_id" => true,
-                "client_secret" => true,
-                "refresh_token" => true,
-            ]);
-        }
-        return $this->_credentials;
-    }
+    private static string $PHOTOS_BASE_URI   = 'https://photoslibrary.googleapis.com/v1/';
+    private static string $PHOTOS_UPLOAD_URI = 'https://uploadsphotos.googleapis.com/v1/uploads';
+    private static int    $PHOTOS_BATCH_SIZE = 50;
 
-    function getAuthCredentials($project_id): UserRefreshCredentials
+    /**
+     * Exchanges the stored refresh token for a short-lived Bearer access token.
+     *
+     * @throws GoogleException
+     * @throws \RuntimeException
+     */
+    private function getAccessToken(int|string $project_id): string
     {
-        if ($this->_authCredentials[$project_id] === null) {
-            $this->_authCredentials[$project_id] = new UserRefreshCredentials(
-            /* Add your scope, client secret and refresh token here */
-                self::AUTH_SCOPE,
-                $this->getCredentials($project_id)
+        $config = $this->getModuleConfig($project_id);
+
+        $client = new \Google_Client();
+        $client->setAuthConfig([
+            'client_id'     => $config['client_id'],
+            'client_secret' => $config['client_secret'],
+            'redirect_uris' => [ $config['redirect_uri'] ],
+        ]);
+        $client->setScopes(self::AUTH_SCOPE);
+
+        $token = $client->fetchAccessTokenWithRefreshToken($config['refresh_token']);
+
+        if (isset($token['error'])) {
+            throw new \RuntimeException(
+                'Failed to refresh Google access token: ' . ($token['error_description'] ?? $token['error'])
             );
         }
-        return $this->_authCredentials[$project_id];
+
+        return $token['access_token'];
     }
 
     /**
-     * @throws ValidationException
+     * Returns a per-project Guzzle client pre-configured with a Bearer token.
+     * The client is cached for the lifetime of the request.
+     *
+     * @throws GoogleException
+     * @throws \RuntimeException
      */
-    function getPhotosLibraryClient($authCredentials): PhotosLibraryClient
+    private function getGuzzleClient(int|string $project_id): GuzzleClient
     {
-        if ($this->_photosLibraryClient === null) {
-            $this->_photosLibraryClient = new PhotosLibraryClient(['credentials' => $authCredentials]);
+        if (!isset($this->_guzzleClients[$project_id])) {
+            $this->_guzzleClients[$project_id] = new GuzzleClient([
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $this->getAccessToken($project_id),
+                ],
+            ]);
         }
-        return $this->_photosLibraryClient;
+        return $this->_guzzleClients[$project_id];
     }
 
     /**
-     * @throws ApiException
-     * @throws ValidationException
+     * Returns all app-created albums as [ title => id ].
+     * Handles pagination automatically.
+     *
+     * @throws RequestException
+     * @throws GoogleException
+     * @throws JsonException
+     * @throws GuzzleException
      */
-    function getAlbums($project_id) {
-        // initialize the client
-        $photosLibraryClient = $this->getPhotosLibraryClient(
-            $this->getAuthCredentials($project_id)
-        );
-
-        $response = $photosLibraryClient->listAlbums([
-            "excludeNonAppCreatedData" => true
-        ]);
-
+    function getAlbums(int|string $project_id): array
+    {
+        $client = $this->getGuzzleClient($project_id);
         $albums = [];
-        foreach ($response->iterateAllElements() as $album) {
-            $albums[$album->getTitle()] = $album->getId();
-        }
+        $pageToken = null;
+
+        do {
+            $query = [ 'excludeNonAppCreatedData' => 'true', 'pageSize' => 50 ];
+            if ($pageToken !== null) {
+                $query['pageToken'] = $pageToken;
+            }
+
+            $response = $client->get(static::$PHOTOS_BASE_URI . 'albums', [ 'query' => $query ]);
+            $body = json_decode((string) $response->getBody(), true, 512, JSON_THROW_ON_ERROR);
+
+            foreach ($body['albums'] ?? [] as $album) {
+                $albums[$album['title']] = $album['id'];
+            }
+
+            $pageToken = $body['nextPageToken'] ?? null;
+        } while ($pageToken !== null);
+
         return $albums;
     }
 
     /**
-     * @throws ApiException
-     * @throws ValidationException
+     * Ensures the target album exists, creating it if necessary.
+     * Caches the resolved album ID for the lifetime of the request.
+     *
+     * @throws RequestException
+     * @throws GoogleException
+     * @throws JsonException
      */
-    function initAlbum($project_id, $album_name, $album_id) {
+    function initAlbum(int|string $project_id, string $album_name, ?string $album_id): string
+    {
         if (empty($this->_album_id)) {
             if (!empty($album_id)) {
                 $this->_album_id = $album_id;
             } else {
                 $albums = $this->getAlbums($project_id);
-                // create album if it doesn't already exist
                 if (isset($albums[$album_name])) {
                     $this->_album_id = $albums[$album_name];
                 } else {
-                    // create album
                     $this->_album_id = $this->createAlbum($project_id, $album_name);
                 }
             }
@@ -97,77 +127,86 @@ trait GooglePhotosUtils {
     }
 
     /**
-     * @param $project_id
-     * @param $image_data
-     * @param $file_name
-     * @param $mime_type
-     * @return string
+     * Uploads raw image bytes to Google Photos and returns the upload token.
+     *
+     * @throws RequestException
+     * @throws GoogleException
      * @throws GuzzleException
-     * @throws ValidationException
      */
-    function uploadImage($project_id, $image_data, $file_name, $mime_type) {
-        // initialize the client
-        $photosLibraryClient = $this->getPhotosLibraryClient(
-            $this->getAuthCredentials($project_id)
-        );
+    function uploadImage(int|string $project_id, string $image_data, string $file_name, string $mime_type): string
+    {
+        $client = $this->getGuzzleClient($project_id);
 
         if (empty($mime_type)) {
-            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            $finfo     = finfo_open(FILEINFO_MIME_TYPE);
             $mime_type = finfo_buffer($finfo, $image_data);
         }
 
-        // Upload the image and get the upload token
-        // return the token
-        return $photosLibraryClient->upload(
-            rawFile: $image_data,
-            fileName: $file_name,
-            mimeType: $mime_type
-        );
+        $response = $client->post(static::$PHOTOS_UPLOAD_URI, [
+            'headers' => [
+                'Content-Type'               => 'application/octet-stream',
+                'X-Goog-Upload-Content-Type' => $mime_type,
+                'X-Goog-Upload-Protocol'     => 'raw',
+                'X-Goog-Upload-File-Name'    => $file_name,
+            ],
+            'body' => $image_data,
+        ]);
+
+        return trim((string) $response->getBody());
     }
 
     /**
-     * @throws ValidationException
-     * @throws ApiException
+     * Adds previously uploaded images (by token) to the target album.
+     * Automatically chunks requests to respect the API batch limit of 50.
+     *
+     * @throws RequestException
+     * @throws GoogleException
+     * @throws JsonException
      */
-    function addImagesToAlbum($project_id, $upload_tokens, $album_name, $album_id) {
-        // initialize the client
-        $photosLibraryClient = $this->getPhotosLibraryClient(
-            $this->getAuthCredentials($project_id)
-        );
-
-        // prep the new media items
-        $new_media_items = [];
-        foreach ($upload_tokens as $token) {
-            $new_media_items[] = PhotosLibraryResourceFactory::newMediaItem($token);
-        }
-
-        // initialize the album to ensure it actually exists
+    function addImagesToAlbum(int|string $project_id, array $upload_tokens, string $album_name, ?string $album_id): array
+    {
+        $client = $this->getGuzzleClient($project_id);
         $this->initAlbum($project_id, $album_name, $album_id);
 
-        // push to the album
-        $result = $photosLibraryClient->batchCreateMediaItems(
-            newMediaItems: $new_media_items,
-            optionalArgs: [
-                "albumId" => $this->_album_id
-            ]
-        );
-        return $result->getNewMediaItemResults();
+        $results = [];
+        foreach (array_chunk($upload_tokens, static::$PHOTOS_BATCH_SIZE) as $chunk) {
+            $new_media_items = array_map(
+                fn(string $token): array => [ 'simpleMediaItem' => [ 'uploadToken' => $token ] ],
+                $chunk
+            );
+
+            $response = $client->post(static::$PHOTOS_BASE_URI . 'mediaItems:batchCreate', [
+                'json' => [
+                    'albumId'       => $this->_album_id,
+                    'newMediaItems' => $new_media_items,
+                ],
+            ]);
+
+            $body = json_decode((string) $response->getBody(), true, 512, JSON_THROW_ON_ERROR);
+            foreach ($body['newMediaItemResults'] ?? [] as $item_result) {
+                $results[] = $item_result;
+            }
+        }
+
+        return $results;
     }
 
     /**
-     * @throws ApiException
-     * @throws ValidationException
+     * Creates a new Google Photos album and returns its ID.
+     *
+     * @throws RequestException
+     * @throws GoogleException
+     * @throws JsonException
      */
-    function createAlbum($project_id, $album_name) {
-        // initialize the client
-        $photosLibraryClient = $this->getPhotosLibraryClient(
-            $this->getAuthCredentials($project_id)
-        );
-        // Create a new Album object with at title
-        $newAlbum = PhotosLibraryResourceFactory::album($album_name);
-        // Make the call to the Library API to create the new album
-        $createdAlbum = $photosLibraryClient->createAlbum($newAlbum);
-        // The creation call returns the ID of the new album
-        return $createdAlbum->getId();
+    function createAlbum(int|string $project_id, string $album_name): string
+    {
+        $client = $this->getGuzzleClient($project_id);
+
+        $response = $client->post(static::$PHOTOS_BASE_URI . 'albums', [
+            'json' => [ 'album' => [ 'title' => $album_name ] ],
+        ]);
+
+        $body = json_decode((string) $response->getBody(), true, 512, JSON_THROW_ON_ERROR);
+        return $body['id'];
     }
 }

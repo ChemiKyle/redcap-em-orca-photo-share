@@ -5,7 +5,6 @@ import PrimeVue from "primevue/config";
 import Lara from '@primevue/themes/lara';
 
 import ProgressSpinner from 'primevue/progressspinner';
-import BlockUI from 'primevue/blockui';
 import Dialog from 'primevue/dialog';
 import Tooltip from 'primevue/tooltip';
 
@@ -31,7 +30,6 @@ app.directive('focus', {
     mounted: (el) => el.focus()
 })
 
-app.component("BlockUI", BlockUI);
 app.component("ProgressSpinner", ProgressSpinner);
 app.component("Dialog", Dialog);
 app.component("Toast", Toast);

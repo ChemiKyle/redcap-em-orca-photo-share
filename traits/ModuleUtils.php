@@ -2,8 +2,8 @@
 namespace OrcaPhotoShare\ExternalModule;
 
 use Exception;
-use Google\ApiCore\ApiException;
-use Google\ApiCore\ValidationException;
+use Google\Exception as GoogleException;
+use GuzzleHttp\Exception\RequestException;
 
 trait ModuleUtils {
 
@@ -49,8 +49,8 @@ trait ModuleUtils {
     }
 
     /**
-     * @throws ApiException
-     * @throws ValidationException
+     * @throws RequestException
+     * @throws GoogleException
      */
     function handleInitializeMainDashboard($project_id) {
         $response = [
@@ -99,6 +99,8 @@ trait ModuleUtils {
 
     /**
      * @throws Exception
+     * @throws RequestException
+     * @throws GoogleException
      */
     function handleSetAlbumName($project_id, $payload) {
         // validate the input

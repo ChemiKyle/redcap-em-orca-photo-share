@@ -1,10 +1,13 @@
 {
     "name": "kadolphc/redcap-em-orca-photo-share",
     "config": {
-        "autoloader-suffix": "_ORCA_PHOTO_SHARE"
+        "autoloader-suffix": "_ORCA_PHOTO_SHARE",
+        "platform": {
+            "php": "8.1.0"
+        }
     },
     "require": {
-        "google/photos-library": "^1.7",
+        "ext-fileinfo": "*",
         "google/apiclient": "^2.18"
     },
     "scripts": {

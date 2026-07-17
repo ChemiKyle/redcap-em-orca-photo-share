@@ -234,140 +234,153 @@ onBeforeMount(() => {
     </div>
     <Toast />
     <ConfirmDialog></ConfirmDialog>
-    <BlockUI :blocked="isLoading">
-        <div v-if="isNotEmpty(refreshTokenExpiresHours) && refreshTokenExpiresHours < 0" class="alert alert-danger fs-6 mt-3">
-            <div class="fw-bold fs-5">Refresh Token is Expired!</div>
-            <hr class="my-2" />
-            <div><strong>Expired:</strong> {{ refreshTokenExpiresDisplay }}</div>
-            <div class="mt-2">Integration is disabled until a new refresh token is obtained. Click the refresh button (<i class="fa-solid fa-rotate text-danger"></i>) below to re-authorize the application and obtain a new refresh token.</div>
-        </div>
-        <div class="card module-config" :class="{ modified: isModified }">
-            <div class="card-body">
-                <template v-if="isEmpty(config)">
-                    <!-- LOADING PLACEHOLDER -->
-                    <div class="text-muted lead">LOADING...</div>
+    <div v-if="isNotEmpty(refreshTokenExpiresHours) && refreshTokenExpiresHours < 0" class="alert alert-danger fs-6 mt-3">
+        <div class="fw-bold fs-5">Refresh Token is Expired!</div>
+        <hr class="my-2" />
+        <div><strong>Expired:</strong> {{ refreshTokenExpiresDisplay }}</div>
+        <div class="mt-2">Integration is disabled until a new refresh token is obtained. Click the refresh button (<i class="fa-solid fa-rotate text-danger"></i>) below to re-authorize the application and obtain a new refresh token.</div>
+    </div>
+    <div class="card module-config" :class="{ modified: isModified }">
+        <div class="card-body">
+            <template v-if="isEmpty(config)">
+                <!-- LOADING PLACEHOLDER -->
+                <div class="text-muted lead">LOADING...</div>
+            </template>
+            <template v-else>
+                <h4 class="mb-2 pb-1 border-dark border-bottom border-3">
+                    <span>General Configuration</span>
+                </h4>
+                <!-- base_domain -->
+                <div class="form-label fw-bold mb-1 mt-2 d-inline-block">Base Domain</div>
+                <div class="input-group">
+                    <button v-if="clipboardEnabled" @click="copyToClipboard(config['base_domain'])" class="btn btn-primary"><i class="fa-solid fa-copy"></i></button>
+                    <input class="form-control font-monospace text-muted" type="text" v-model="config['base_domain']" readonly disabled />
+                </div>
+                <!-- redirect_uri -->
+                <div class="form-label fw-bold mb-1 mt-2 d-inline-block">Redirect URI</div>
+                <div class="input-group">
+                    <button v-if="clipboardEnabled" @click="copyToClipboard(config['redirect_uri'])" class="btn btn-primary"><i class="fa-solid fa-copy"></i></button>
+                    <input class="form-control font-monospace text-muted" type="text" v-model="config['redirect_uri']" readonly disabled />
+                </div>
+                <!-- scopes -->
+                <div class="form-label fw-bold mt-3 mb-1 d-inline-block">Authorization Scopes</div>
+                <div class="input-group">
+                    <button v-if="clipboardEnabled" @click="copyToClipboard(scopeStr)" class="btn btn-primary"><i class="fa-solid fa-copy"></i></button>
+                    <textarea class="form-control font-monospace text-muted" type="text" v-model="scopeStr" rows="3" readonly disabled />
+                </div>
+
+                <hr class="mt-4 mb-3">
+
+                <h4 class="mb-2 pb-1 border-dark border-bottom border-3">
+                    <span>Google Cloud Console</span>
+                    <a href="https://code.google.com/apis/console" target="_blank" class="fs-5 px-2"><i class="fa-solid fa-up-right-from-square"></i></a>
+                </h4>
+                <!-- client_id -->
+                <div class="form-label fw-bold mb-1 mt-3 d-inline-block">Google Client ID</div>
+                <input class="form-control font-monospace text-muted" type="text" v-model="config['client_id']" readonly disabled />
+                <!-- client_secret -->
+                <div class="form-label fw-bold mt-3 mb-1 d-inline-block">Google Client Secret&nbsp;<i class="fas fa-info-circle text-primary fs-6" v-tooltip="'The full value is never displayed here, to ensure it stays secure.'"></i></div>
+                <input class="form-control font-monospace text-muted" type="text" v-model="config['client_secret']" readonly disabled />
+                <!-- refresh_token -->
+                <div class="form-label fw-bold mt-3 mb-1 d-inline-block">Refresh Token&nbsp;<i class="fas fa-info-circle text-primary fs-6" v-tooltip="'The full value is never displayed here, to ensure it stays secure.'"></i></div>
+                <div class="input-group">
+                    <button v-if="isNotEmpty(config['refresh_token'])" @click="confirmRefreshToken" class="btn btn-danger"><i class="fa-solid fa-rotate"></i></button>
+                    <input class="form-control font-monospace text-muted" type="text" v-model="config['refresh_token']" readonly disabled />
+                </div>
+                <div v-if="isNotEmpty(refreshTokenExpiresHours)" class="text-secondary fst-italic mt-1">Expires: <strong>{{ refreshTokenExpiresDisplay }}</strong></div>
+                <div class="d-flex gap-3 mt-3">
+                    <button class="btn btn-sm btn-primary" @click="editClientInfo"><i class="fas fa-pen-to-square"></i>&nbsp;Edit Client Info</button>
+                </div>
+
+                <hr class="mt-4 mb-3">
+
+                <h4 class="mb-2 pb-1 border-dark border-bottom border-3">
+                    <span>Album Configuration</span>
+                </h4>
+                <!-- album_name -->
+                <div class="form-label fw-bold mb-1 mt-3 d-inline-block">Google Photos Album Name</div>
+                <input class="form-control font-monospace text-muted" type="text" v-model="config['album_name']" readonly disabled />
+                <!-- album_id -->
+                <div class="form-label fw-bold mb-1 mt-3 d-inline-block">Google Photos Album ID</div>
+                <input class="form-control font-monospace text-muted" type="text" v-model="config['album_id']" readonly disabled />
+                <template v-if="canCreateAlbum">
+                    <div class="d-flex gap-3 mt-3">
+                        <button class="btn btn-sm btn-primary" @click="editAlbumName"><i class="fas fa-pen-to-square"></i>&nbsp;Edit Album Info</button>
+                    </div>
                 </template>
                 <template v-else>
-                    <h4 class="mb-2 pb-1 border-dark border-bottom border-3">
-                        <span>General Configuration</span>
-                    </h4>
-                    <!-- base_domain -->
-                    <div class="form-label fw-bold mb-1 mt-2 d-inline-block">Base Domain</div>
-                    <div class="input-group">
-                        <button v-if="clipboardEnabled" @click="copyToClipboard(config['base_domain'])" class="btn btn-primary"><i class="fa-solid fa-copy"></i></button>
-                        <input class="form-control font-monospace text-muted" type="text" v-model="config['base_domain']" readonly disabled />
-                    </div>
-                    <!-- redirect_uri -->
-                    <div class="form-label fw-bold mb-1 mt-2 d-inline-block">Redirect URI</div>
-                    <div class="input-group">
-                        <button v-if="clipboardEnabled" @click="copyToClipboard(config['redirect_uri'])" class="btn btn-primary"><i class="fa-solid fa-copy"></i></button>
-                        <input class="form-control font-monospace text-muted" type="text" v-model="config['redirect_uri']" readonly disabled />
-                    </div>
-                    <!-- scopes -->
-                    <div class="form-label fw-bold mt-3 mb-1 d-inline-block">Authorization Scopes</div>
-                    <div class="input-group">
-                        <button v-if="clipboardEnabled" @click="copyToClipboard(scopeStr)" class="btn btn-primary"><i class="fa-solid fa-copy"></i></button>
-                        <textarea class="form-control font-monospace text-muted" type="text" v-model="scopeStr" rows="3" readonly disabled />
-                    </div>
-
-                    <hr class="mt-4 mb-3">
-
-                    <h4 class="mb-2 pb-1 border-dark border-bottom border-3">
-                        <span>Google Cloud Console</span>
-                        <a href="https://code.google.com/apis/console" target="_blank" class="fs-5 px-2"><i class="fa-solid fa-up-right-from-square"></i></a>
-                    </h4>
-                    <!-- client_id -->
-                    <div class="form-label fw-bold mb-1 mt-3 d-inline-block">Google Client ID</div>
-                    <input class="form-control font-monospace text-muted" type="text" v-model="config['client_id']" readonly disabled />
-                    <!-- client_secret -->
-                    <div class="form-label fw-bold mt-3 mb-1 d-inline-block">Google Client Secret&nbsp;<i class="fas fa-info-circle text-primary fs-6" v-tooltip="'The full value is never displayed here, to ensure it stays secure.'"></i></div>
-                    <input class="form-control font-monospace text-muted" type="text" v-model="config['client_secret']" readonly disabled />
-                    <!-- refresh_token -->
-                    <div class="form-label fw-bold mt-3 mb-1 d-inline-block">Refresh Token&nbsp;<i class="fas fa-info-circle text-primary fs-6" v-tooltip="'The full value is never displayed here, to ensure it stays secure.'"></i></div>
-                    <div class="input-group">
-                        <button v-if="isNotEmpty(config['refresh_token'])" @click="confirmRefreshToken" class="btn btn-danger"><i class="fa-solid fa-rotate"></i></button>
-                        <input class="form-control font-monospace text-muted" type="text" v-model="config['refresh_token']" readonly disabled />
-                    </div>
-                    <div v-if="isNotEmpty(refreshTokenExpiresHours)" class="text-secondary fst-italic mt-1">Expires: <strong>{{ refreshTokenExpiresDisplay }}</strong></div>
-                    <div class="d-flex gap-3 mt-3">
-                        <button class="btn btn-sm btn-primary" @click="editClientInfo"><i class="fas fa-pen-to-square"></i>&nbsp;Edit Client Info</button>
-                    </div>
-
-                    <hr class="mt-4 mb-3">
-
-                    <h4 class="mb-2 pb-1 border-dark border-bottom border-3">
-                        <span>Album Configuration</span>
-                    </h4>
-                    <!-- album_name -->
-                    <div class="form-label fw-bold mb-1 mt-3 d-inline-block">Google Photos Album Name</div>
-                    <input class="form-control font-monospace text-muted" type="text" v-model="config['album_name']" readonly disabled />
-                    <!-- album_id -->
-                    <div class="form-label fw-bold mb-1 mt-3 d-inline-block">Google Photos Album ID</div>
-                    <input class="form-control font-monospace text-muted" type="text" v-model="config['album_id']" readonly disabled />
-                    <template v-if="canCreateAlbum">
-                        <div class="d-flex gap-3 mt-3">
-                            <button class="btn btn-sm btn-primary" @click="editAlbumName"><i class="fas fa-pen-to-square"></i>&nbsp;Edit Album Info</button>
-                        </div>
-                    </template>
-                    <template v-else>
-                        <div class="alert alert-warning mt-3">Cannot Configure the Photo Album until the previous configuration step is complete!</div>
-                    </template>
+                    <div class="alert alert-warning mt-3">Cannot Configure the Photo Album until the previous configuration step is complete!</div>
                 </template>
+            </template>
+        </div>
+    </div>
+    <pre v-if="debug" class="mt-3">{{ debug }}</pre>
+    <Dialog modal v-model:visible="clientInfoDialogVisible" header="Edit Client Info" :style="{ width: '50rem' }" position="top"
+            @after-hide="clearClientInfoDialogState" @show="focusClientId"
+    >
+        <div v-if="clientInfoDialogState" class="card">
+            <div class="card-header">
+                Provide the Client ID and Client Secret values obtained from the Google Cloud Console.
+                <div class="p-2 border-start border-5 border-warning bg-warning-subtle mt-3 mb-0 d-flex flex-row gap-2">
+                    <strong>NOTE:</strong><div>After clicking Save, any stored Refresh Token will be <strong class="text-danger">erased</strong> and a <strong>new Authorization Request</strong> will be initiated!  Until this request is complete, the module will not be able to push images to your Album.</div>
+                </div>
+            </div>
+            <div class="card-body px-3 pt-2 pb-3">
+                <!-- client_id -->
+                <div class="form-label fw-bold mb-1 d-inline-block">Google Client ID</div>
+                <input ref="client-id-modal" class="form-control font-monospace text-muted" type="text" v-model="clientInfoDialogState['client_id']" />
+                <!-- client_secret -->
+                <div class="form-label fw-bold mt-3 mb-1 d-inline-block">Google Client Secret</div>
+                <input class="form-control font-monospace text-muted" type="text" v-model="clientInfoDialogState['client_secret']" />
+
+                <div v-if="!canSaveClientInfo" class="alert alert-danger mt-3 mb-0">Must provide a value for both fields before saving.</div>
             </div>
         </div>
-        <pre v-if="debug" class="mt-3">{{ debug }}</pre>
+        <template #footer>
+            <button type="button" class="btn btn-primary" @click="saveClientInfo" :disabled="!canSaveClientInfo"><i class="fa-solid fa-floppy-disk"></i>&nbsp;Save</button>
+            <button type="button" class="btn btn-outline-danger" @click="clientInfoDialogVisible = false"><i class="fa-solid fa-ban"></i>&nbsp;Cancel</button>
+        </template>
+    </Dialog>
 
-        <Dialog modal v-model:visible="clientInfoDialogVisible" header="Edit Client Info" :style="{ width: '50rem' }" position="top"
-                @after-hide="clearClientInfoDialogState" @show="focusClientId"
-        >
-            <div v-if="clientInfoDialogState" class="card">
-                <div class="card-header">
-                    Provide the Client ID and Client Secret values obtained from the Google Cloud Console.
-                    <div class="p-2 border-start border-5 border-warning bg-warning-subtle mt-3 mb-0 d-flex flex-row gap-2">
-                        <strong>NOTE:</strong><div>After clicking Save, any stored Refresh Token will be <strong class="text-danger">erased</strong> and a <strong>new Authorization Request</strong> will be initiated!  Until this request is complete, the module will not be able to push images to your Album.</div>
-                    </div>
-                </div>
-                <div class="card-body px-3 pt-2 pb-3">
-                    <!-- client_id -->
-                    <div class="form-label fw-bold mb-1 d-inline-block">Google Client ID</div>
-                    <input ref="client-id-modal" class="form-control font-monospace text-muted" type="text" v-model="clientInfoDialogState['client_id']" />
-                    <!-- client_secret -->
-                    <div class="form-label fw-bold mt-3 mb-1 d-inline-block">Google Client Secret</div>
-                    <input class="form-control font-monospace text-muted" type="text" v-model="clientInfoDialogState['client_secret']" />
-
-                    <div v-if="!canSaveClientInfo" class="alert alert-danger mt-3 mb-0">Must provide a value for both fields before saving.</div>
+    <Dialog modal v-model:visible="albumNameDialogVisible" header="Edit Album Name" :style="{ width: '50rem' }" position="top"
+            @after-hide="clearAlbumNameDialogState" @show="focusAlbumName"
+    >
+        <div v-if="albumNameDialogState" class="card">
+            <div class="card-header">
+                Create an Album by providing an Album Name.  Be descriptive and ensure the name is unique!
+                <div class="p-2 border-start border-5 border-warning bg-warning-subtle mt-3 mb-0 d-flex flex-row gap-2">
+                    <strong>NOTE:</strong><div>After clicking Save, an attempt will be made to create the Photos Album. If an existing album is found with the same name, that Album ID will be used, instead of creating a new one.</div>
                 </div>
             </div>
-            <template #footer>
-                <button type="button" class="btn btn-primary" @click="saveClientInfo" :disabled="!canSaveClientInfo"><i class="fa-solid fa-floppy-disk"></i>&nbsp;Save</button>
-                <button type="button" class="btn btn-outline-danger" @click="clientInfoDialogVisible = false"><i class="fa-solid fa-ban"></i>&nbsp;Cancel</button>
-            </template>
-        </Dialog>
-
-        <Dialog modal v-model:visible="albumNameDialogVisible" header="Edit Album Name" :style="{ width: '50rem' }" position="top"
-                @after-hide="clearAlbumNameDialogState" @show="focusAlbumName"
-        >
-            <div v-if="albumNameDialogState" class="card">
-                <div class="card-header">
-                    Create an Album by providing an Album Name.  Be descriptive and ensure the name is unique!
-                    <div class="p-2 border-start border-5 border-warning bg-warning-subtle mt-3 mb-0 d-flex flex-row gap-2">
-                        <strong>NOTE:</strong><div>After clicking Save, an attempt will be made to create the Photos Album. If an existing album is found with the same name, that Album ID will be used, instead of creating a new one.</div>
-                    </div>
-                </div>
-                <div class="card-body px-3 pt-2 pb-3">
-                    <!-- album_name -->
-                    <div class="form-label fw-bold mb-1 d-inline-block">Photos Album Name</div>
-                    <input ref="album-name-modal" class="form-control font-monospace text-muted" type="text" v-model="albumNameDialogState['album_name']" />
-                </div>
+            <div class="card-body px-3 pt-2 pb-3">
+                <!-- album_name -->
+                <div class="form-label fw-bold mb-1 d-inline-block">Photos Album Name</div>
+                <input ref="album-name-modal" class="form-control font-monospace text-muted" type="text" v-model="albumNameDialogState['album_name']" />
             </div>
-            <template #footer>
-                <button type="button" class="btn btn-primary" @click="saveAlbumName" :disabled="!canSaveAlbumName"><i class="fa-solid fa-floppy-disk"></i>&nbsp;Save</button>
-                <button type="button" class="btn btn-outline-danger" @click="albumNameDialogVisible = false"><i class="fa-solid fa-ban"></i>&nbsp;Cancel</button>
-            </template>
-        </Dialog>
+        </div>
+        <template #footer>
+            <button type="button" class="btn btn-primary" @click="saveAlbumName" :disabled="!canSaveAlbumName"><i class="fa-solid fa-floppy-disk"></i>&nbsp;Save</button>
+            <button type="button" class="btn btn-outline-danger" @click="albumNameDialogVisible = false"><i class="fa-solid fa-ban"></i>&nbsp;Cancel</button>
+        </template>
+    </Dialog>
 
-        <ProgressSpinner v-show="isLoading" class="overlay"/>
-    </BlockUI>
+    <Dialog v-model:visible="isLoading"
+            modal
+            :dismissable-mask="false"
+            :closable="false"
+            pt:root:class="border-0 bg-transparent shadow-none"
+            pt:mask:class="bg-dark bg-opacity-50 backdrop-blur"
+    >
+        <template #container>
+            <div class="d-flex flex-column align-items-center justify-content-center p-3">
+                <ProgressSpinner
+                    stroke-width="4"
+                    animation-duration=".8s"
+                    aria-label="Loading content"
+                />
+            </div>
+        </template>
+    </Dialog>
 </template>
 
 <style>
