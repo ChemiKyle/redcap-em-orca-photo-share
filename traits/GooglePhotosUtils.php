@@ -15,8 +15,10 @@ trait GooglePhotosUtils {
     private ?string $_album_id = null;
     private array $_guzzleClients = [];
 
+    /*
+     * https://developers.google.com/photos/library/guides/upload-media
+     */
     private static string $PHOTOS_BASE_URI   = 'https://photoslibrary.googleapis.com/v1/';
-    private static string $PHOTOS_UPLOAD_URI = 'https://uploadsphotos.googleapis.com/v1/uploads';
     private static int    $PHOTOS_BATCH_SIZE = 50;
 
     /**
@@ -142,7 +144,7 @@ trait GooglePhotosUtils {
             $mime_type = finfo_buffer($finfo, $image_data);
         }
 
-        $response = $client->post(static::$PHOTOS_UPLOAD_URI, [
+        $response = $client->post(static::$PHOTOS_BASE_URI . 'uploads', [
             'headers' => [
                 'Content-Type'               => 'application/octet-stream',
                 'X-Goog-Upload-Content-Type' => $mime_type,
