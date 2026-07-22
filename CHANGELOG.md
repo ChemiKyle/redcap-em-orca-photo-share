@@ -1,3 +1,5 @@
+## 1.1.1
+- Updated a Composer package due to reported security vulnerabilities.
 ## 1.1.0
 - Security Fix: Dropped usage of the 'google/photos-library' package due to a dependency vulnerability that could not be updated.
 - Bug Fix: Fixed a bug that prevented the creation of Albums

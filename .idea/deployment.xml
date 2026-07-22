@@ -6,7 +6,7 @@
       <paths name="local">
         <serverdata>
           <mappings>
-            <mapping deploy="\modules\orca_photo_share_v1.1.0" local="$PROJECT_DIR$" web="/" />
+            <mapping deploy="\modules\orca_photo_share_v1.1.1" local="$PROJECT_DIR$" web="/" />
           </mappings>
           <excludedPaths>
             <excludedPath local="true" path="$PROJECT_DIR$/.idea" />
@@ -25,7 +25,7 @@
       <paths name="redcap-local">
         <serverdata>
           <mappings>
-            <mapping deploy="\modules\orca_photo_share_v1.1.0" local="$PROJECT_DIR$" web="/" />
+            <mapping deploy="\modules\orca_photo_share_v1.1.1" local="$PROJECT_DIR$" web="/" />
           </mappings>
           <excludedPaths>
             <excludedPath local="true" path="$PROJECT_DIR$/.idea" />
